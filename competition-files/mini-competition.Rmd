@@ -6,3 +6,26 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+```{r library-example, eval = FALSE}
+library(tidyverse)
+library(tidymodels)
+```
+
+
+
+```{r load-data}
+news_data <- readr::read_csv("data/news.csv")
+```
+
+
+```{r train-test}
+set.seed(2001)
+# put 70% of the data into the training set
+news_data_split <- initial_split(news_data, prop = 0.70)
+
+# assign the two splits to data frames - with descriptive names
+news_data_train <- training(news_data_split)
+news_data_test <- testing(news_data_split)
+```
+

@@ -15,7 +15,7 @@ library(tidymodels)
 
 
 ```{r load-data}
-news_data <- readr::read_csv("data/news.csv")
+news_data <- readr::read_csv("/data/news.csv")
 ```
 
 
@@ -27,5 +27,10 @@ news_data_split <- initial_split(news_data, prop = 0.70)
 # assign the two splits to data frames - with descriptive names
 news_data_train <- training(news_data_split)
 news_data_test <- testing(news_data_split)
+```
+
+```{r output-data}
+write.csv(news_data_train, "data\news_train.csv", row.names=FALSE)
+write.csv(news_data_test, "data\news_test.csv", row.names=FALSE)
 ```
 

@@ -1,22 +1,307 @@
 ---
-title: "Linear Regression Mini-competition"
-output: github_document
+title: "Linear Regression Mini-Competition"
+authors: "Michael Minzey, Beatrice Ngigi and Aman Prajapati"
+output: 
+  prettydoc::html_pretty:
+    theme: architect
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, eval = TRUE, message= FALSE, 
+                      warning = FALSE)
 ```
 
+### Loading libraries
 ```{r library-example, eval = FALSE}
 library(tidyverse)
 library(tidymodels)
+library(ggplot2)
 library(yardstick)
 library(ggplot2)
 ```
 
+### Importing the dataset
 ```{r load-data}
-news_data <- readr::read_csv("./data/news.csv")
+news_data <- readr::read_csv("~/STA 631/Mini-Competition/data/news.csv")
 ```
+
+### Checking the dimensions
+```{r Dimensions}
+# Get the number of rows and columns of the dataset
+num_rows <- nrow(news_data)
+num_cols <- ncol(news_data)
+print(paste("Number of Rows:", num_rows))
+print(paste("Number of Columns:", num_cols))
+```
+
+### Checking missing values
+```{r Missing values}
+# Check for missing values in the dataset
+missing_values <- sum(is.na(news_data))
+print(paste("Number of Missing Values:", missing_values))
+```
+
+### Handling the missing values
+```{r Handling missing values}
+# Remove rows with missing values
+news1_data <- na.omit(news_data)
+
+# Print the dimensions of the cleaned dataset
+clean_dimensions <- dim(news1_data)
+print(paste("Dimensions of Cleaned Dataset (rows, columns):", clean_dimensions))
+```
+
+### Checking the number of unique values per columns
+```{r Unique values and category of the columns}
+# Identify numeric columns
+numeric_columns <- sapply(news1_data, is.numeric)
+
+# Identify categorical columns
+categorical_columns <- sapply(news1_data, function(x) !is.numeric(x))
+
+# Calculate the number of unique values in each numeric column
+unique_counts_numeric <- sapply(news1_data[, numeric_columns], function(x) length(unique(x)))
+
+# Calculate the number of unique values in each categorical column
+unique_counts_categorical <- sapply(news1_data[, categorical_columns], function(x) length(unique(x)))
+
+# Print the total number of unique values for each numeric column
+print("Total number of unique values in each numeric column:")
+print(unique_counts_numeric)
+
+# Print the total number of unique values for each categorical column
+print("\nTotal number of unique values in each categorical column:")
+print(unique_counts_categorical)
+
+```
+
+Variable selection:- The following variables were eliminated from the subsequent analysis since they had too many unique values. Hence the model cannot learn from them - IDLink, Title, Headline, Source and PublishDate.
+
+### Variable elimination
+```{r}
+# Specify columns to remove
+columns_to_remove <- c("IDLink", "Title", "Headline", "Source", "PublishDate")
+
+# Remove specified columns
+news1_data <- news1_data[, !names(news1_data) %in% columns_to_remove]
+
+# Print dimensions of the dataset after removing columns
+print("Dimensions after removing specified columns:")
+print(dim(news1_data))
+```
+
+### Checking for outliers
+```{r Outliers}
+library(ggplot2)
+
+# Specify the columns for box plots
+columns <- c("SentimentTitle", "SentimentHeadline", "Facebook", "GooglePlus", "LinkedIn")
+
+# Reshape the data for plotting
+news1_data_long <- tidyr::pivot_longer(news1_data, cols = columns, names_to = "Variable", values_to = "Value")
+
+# Create box plots
+ggplot(news1_data_long, aes(x = Variable, y = Value)) +
+  geom_boxplot(fill = "skyblue", color = "blue") +
+  labs(title = "Box Plots of SentimentTitle, SentimentHeadline, Facebook, GooglePlus, and LinkedIn",
+       x = "Variable", y = "Value") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~Variable, scales = "free")
+
+```
+
+There are outliers in the dataset.
+
+```{r Removing outliers in the Linkedin Column}
+# Function to identify and remove outliers from a numeric column
+remove_outliers_from_column <- function(column) {
+  Q1 <- quantile(column, 0.25)
+  Q3 <- quantile(column, 0.75)
+  IQR <- Q3 - Q1
+  lower_threshold <- Q1 - 1.5 * IQR
+  upper_threshold <- Q3 + 1.5 * IQR
+  column[!(column < lower_threshold | column > upper_threshold)]
+}
+
+# Identify outliers in the "LinkedIn" column
+linkedin_outliers <- which(news1_data$LinkedIn < quantile(news1_data$LinkedIn, 0.25) - 1.5 * IQR(news1_data$LinkedIn) |
+                           news1_data$LinkedIn > quantile(news1_data$LinkedIn, 0.75) + 1.5 * IQR(news1_data$LinkedIn))
+
+# Remove rows with outliers in the "LinkedIn" column
+news1_data <- news1_data[-linkedin_outliers, ]
+
+# Print dimensions after removing rows with outliers in the "LinkedIn" column
+print("Dimensions after removing rows with outliers in the LinkedIn column:")
+print(dim(news1_data))
+
+```
+
+
+```{r checking for outliers the second time}
+library(ggplot2)
+
+# Specify the columns for box plots
+columns <- c("SentimentTitle", "SentimentHeadline", "Facebook", "GooglePlus", "LinkedIn")
+
+# Reshape the data for plotting
+news1_data_long <- tidyr::pivot_longer(news1_data, cols = columns, names_to = "Variable", values_to = "Value")
+
+# Create box plots
+ggplot(news1_data_long, aes(x = Variable, y = Value)) +
+  geom_boxplot(fill = "skyblue", color = "blue") +
+  labs(title = "Box Plots of SentimentTitle, SentimentHeadline, Facebook, GooglePlus, and LinkedIn",
+       x = "Variable", y = "Value") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~Variable, scales = "free")
+
+```
+
+```{r removing outliers in the GooglePlus column}
+# Function to identify and remove outliers from a numeric column
+remove_outliers_from_column <- function(column) {
+  Q1 <- quantile(column, 0.25)
+  Q3 <- quantile(column, 0.75)
+  IQR <- Q3 - Q1
+  lower_threshold <- Q1 - 1.5 * IQR
+  upper_threshold <- Q3 + 1.5 * IQR
+  column[!(column < lower_threshold | column > upper_threshold)]
+}
+
+# Identify outliers in the "GooglePlus" column
+googleplus_outliers <- which(news1_data$GooglePlus < quantile(news1_data$GooglePlus, 0.25) - 1.5 * IQR(news1_data$GooglePlus) |
+                           news1_data$GooglePlus > quantile(news1_data$GooglePlus, 0.75) + 1.5 * IQR(news1_data$GooglePlus))
+
+# Remove rows with outliers in the "GooglePlus" column
+news1_data <- news1_data[-googleplus_outliers, ]
+
+# Print dimensions after removing rows with outliers in the "GooglePlus" column
+print("Dimensions after removing rows with outliers in the GooglePlus column:")
+print(dim(news1_data))
+
+```
+
+```{r checking for outliers the third time}
+library(ggplot2)
+
+# Specify the columns for box plots
+columns <- c("SentimentTitle", "SentimentHeadline", "Facebook", "GooglePlus", "LinkedIn")
+
+# Reshape the data for plotting
+news1_data_long <- tidyr::pivot_longer(news1_data, cols = columns, names_to = "Variable", values_to = "Value")
+
+# Create box plots
+ggplot(news1_data_long, aes(x = Variable, y = Value)) +
+  geom_boxplot(fill = "skyblue", color = "blue") +
+  labs(title = "Box Plots of SentimentTitle, SentimentHeadline, Facebook, GooglePlus, and LinkedIn",
+       x = "Variable", y = "Value") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~Variable, scales = "free")
+
+```
+
+```{r removing outliers in the facebook column}
+
+# Function to identify and remove outliers from a numeric column
+remove_outliers_from_column <- function(column) {
+  Q1 <- quantile(column, 0.25)
+  Q3 <- quantile(column, 0.75)
+  IQR <- Q3 - Q1
+  lower_threshold <- Q1 - 1.5 * IQR
+  upper_threshold <- Q3 + 1.5 * IQR
+  column[!(column < lower_threshold | column > upper_threshold)]
+}
+
+# Identify outliers in the "Facebook" column
+facebook_outliers <- which(news1_data$Facebook < quantile(news1_data$Facebook, 0.25) - 1.5 * IQR(news1_data$Facebook) |
+                           news1_data$Facebook > quantile(news1_data$Facebook, 0.75) + 1.5 * IQR(news1_data$Facebook))
+
+# Remove rows with outliers in the "Facebook" column
+news1_data <- news1_data[-facebook_outliers, ]
+
+# Print dimensions after removing rows with outliers in the "Facebook" column
+print("Dimensions after removing rows with outliers in the Facebook column:")
+print(dim(news1_data))
+
+```
+
+```{r ensuring there are no outliers}
+library(ggplot2)
+
+# Specify the columns for box plots
+columns <- c("SentimentTitle", "SentimentHeadline", "Facebook", "GooglePlus", "LinkedIn")
+
+# Reshape the data for plotting
+news1_data_long <- tidyr::pivot_longer(news1_data, cols = columns, names_to = "Variable", values_to = "Value")
+
+# Create box plots
+ggplot(news1_data_long, aes(x = Variable, y = Value)) +
+  geom_boxplot(fill = "skyblue", color = "blue") +
+  labs(title = "Box Plots of SentimentTitle, SentimentHeadline, Facebook, GooglePlus, and LinkedIn",
+       x = "Variable", y = "Value") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  facet_wrap(~Variable, scales = "free")
+```
+
+There are no outliers.
+
+### Checking for multicollinearity
+```{r Correlations}
+# Select numeric columns
+numeric_columns <- sapply(news1_data, is.numeric)
+numeric_data <- news1_data[, numeric_columns]
+
+# Calculate correlation matrix
+correlation_matrix <- cor(numeric_data)
+
+# Print correlation matrix
+print("Correlation Matrix:")
+print(correlation_matrix)
+```
+
+There is no multicollinearity. Presence of weak correlations.
+
+### Exploring the variable of interest
+```{r}
+# Load necessary library
+# Create histogram for SentimentHeadline
+ggplot(news1_data, aes(x = SentimentHeadline)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of SentimentHeadline",
+       x = "SentimentHeadline",
+       y = "Frequency")
+```
+
+It is normally distributed.
+
+### The distribution of the categorical variable
+```{r}
+library(ggplot2)
+# Plot the distribution of the "Topic" column
+ggplot(news1_data, aes(x = Topic)) +
+  geom_bar(fill = "skyblue", color = "blue") +
+  labs(title = "Distribution of Topic", x = "Topic", y = "Frequency") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Relationship between variable of interest and the other variables
+```{r}
+# Load necessary library
+library(ggplot2)
+
+# Create scatter plots for SentimentHeadline against each numeric variable
+scatter_plots <- lapply(names(news1_data)[sapply(news1_data, is.numeric)], function(var) {
+  ggplot(news1_data, aes(x = SentimentHeadline, y = .data[[var]])) +
+    geom_point() +
+    labs(title = paste("Scatter Plot of SentimentHeadline vs", var),
+         x = "SentimentHeadline", y = var)
+})
+
+# Print scatter plots
+scatter_plots
+```
+
+Based on the scatter plots, it appears that Facebook, GooglePlus, and LinkedIn do not exhibit a clear linear relationship with SentimentHeadline. Therefore, considering the lack of linear association, we will explore using Topic and SentimentTitle as potential predictors for building a model to predict SentimentHeadline.
+
 
 ```{r train-test}
 set.seed(2001)

@@ -1,0 +1,107 @@
+---
+title: "Linear Regression Mini-competition"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library-example, eval = FALSE}
+library(tidyverse)
+library(tidymodels)
+library(yardstick)
+library(ggplot2)
+```
+
+```{r load-data}
+news_data <- readr::read_csv("./data/news.csv")
+```
+
+```{r train-test}
+set.seed(2001)
+# put 70% of the data into the training set
+news_data_split <- initial_split(news_data, prop = 0.70)
+
+# assign the two splits to data frames - with descriptive names
+news_data_train <- training(news_data_split)
+news_data_test <- testing(news_data_split)
+```
+
+```{r output-data}
+write.csv(news_data_train, "data\news_train.csv", row.names=FALSE)
+write.csv(news_data_test, "data\news_test.csv", row.names=FALSE)
+```
+
+
+```{r mlr-model}
+#fit the mlr model
+lm_spec <- linear_reg() %>%
+  set_mode("regression") %>%
+  set_engine("lm")
+
+mlr_mod <- lm_spec %>% 
+fit(SentimentHeadline ~ Topic + SentimentTitle + Facebook + GooglePlus + LinkedIn, data = news_data_train)
+
+# model output
+tidy(mlr_mod)
+```
+
+```{r}
+
+# Predict using the test data
+news_data_predictions <- predict(mlr_mod, new_data = news_data_test)
+
+# Bind the predictions with the actual outcomes for easier comparison
+news_data_results <- news_data_test %>%
+  select(SentimentHeadline) %>%
+  bind_cols(news_data_predictions)
+
+# Assuming your outcome variable is continuous
+# For RMSE
+rmse_val <- news_data_results %>%
+  rmse(truth = SentimentHeadline, estimate = .pred)
+
+# For R-squared
+rsq_val <- news_data_results %>%
+  rsq(truth = SentimentHeadline, estimate = .pred)
+
+# Print the metrics
+print(rmse_val)
+print(rsq_val)
+```
+
+```{r residual-predicated}
+ggplot(news_data_results, aes(x = .pred, y = SentimentHeadline - .pred)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_point(alpha = 0.5) +
+  labs(x = "Predicted Values", y = "Residuals", title = "Residuals vs. Predicted Values") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(news_data_results, aes(x = SentimentHeadline - .pred)) +
+  geom_density(fill = "blue", alpha = 0.5) +
+  labs(x = "Error", y = "Density", title = "Density of Prediction Errors") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+```{r}
+# Assuming mlr_mod is your linear regression model object
+residuals <- residuals(mlr_mod)
+
+# Create a Normal Q-Q plot
+qqnorm(residuals)
+qqline(residuals, col = "red") # Add a reference line
+
+# Create a Q-Q plot with ggplot2
+ggplot(df, aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(colour = "red") +
+  ggtitle("Normal Q-Q Plot of Residuals") +
+  theme_minimal()
+
+
+```
+
+
